@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Videojuegos CRUD</title>
+  <style>
+    body {
+      font-family: Arial;
+      background: #111;
+      color: #eee;
+      text-align: center;
+      margin: 0;
+    }
+    table {
+      width: 90%;
+      margin: 20px auto;
+      border-collapse: collapse;
+      background: #222;
+    }
+    th, td {
+      border: 1px solid #555;
+      padding: 10px;
+    }
+    th {
+      background: #333;
+    }
+    a, button {
+      background: #00bcd4;
+      color: white;
+      padding: 5px 10px;
+      text-decoration: none;
+      border: none;
+      cursor: pointer;
+    }
+    a:hover, button:hover {
+      background: #0097a7;
+    }
+  </style>
+</head>
+<body>
+  <h1>Lista de Videojuegos</h1>
+  <a href="crear.html">➕ Crear nuevo</a>
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th><th>Nombre</th><th>Género</th><th>Plataforma</th><th>Precio</th><th>Acciones</th>
+      </tr>
+    </thead>
+    <tbody id="tabla"></tbody>
+  </table>
+
+  <script>
+    async function cargarVideojuegos() {
+      const res = await fetch('/api/videojuegos');
+      const data = await res.json();
+
+      const tabla = document.getElementById('tabla');
+      tabla.innerHTML = data.datos.map(v => `
+        <tr>
+          <td>${v.id}</td>
+          <td>${v.nombre}</td>
+          <td>${v.genero}</td>
+          <td>${v.plataforma}</td>
+          <td>${v.precio}</td>
+          <td>
+            <a href="editar.html?id=${v.id}">Editar</a>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    cargarVideojuegos();
+  </script>
+</body>
+</html>
