@@ -5,7 +5,9 @@ const {probarConexion} = require('./config/basedatos');
 const {
     obtenertodoslosvideojuegos,
     obtenervideojuegosporid,
-    crearvideojuego
+    crearvideojuego,
+    ActualizarVideojuego,
+    EliminarVideojuego
 } = require('./controller/videojuegoscontrolador');
 
 const app = express();
@@ -52,6 +54,8 @@ app.get('/', (req,res) => {
 app.get('/api/videojuegos', obtenertodoslosvideojuegos);
 app.get('/api/videojuegos/:id', obtenervideojuegosporid);
 app.post('/api/videojuegos', crearvideojuego);
+app.put('/api/videojuegos/:id', ActualizarVideojuego);
+app.delete('/api/videojuegos/:id', EliminarVideojuego);
 
 const iniciarServidor = async () => {
     try {

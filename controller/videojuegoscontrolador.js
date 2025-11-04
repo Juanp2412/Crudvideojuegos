@@ -84,7 +84,7 @@ const crearvideojuego = async (req, res) => {
     }
 };
 
-const actualizarvideojuego = async (req, res) => {
+const ActualizarVideojuego = async (req, res) => {
     try {
         const {id} = req.params;    
         const {nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion} = req.body;
@@ -92,9 +92,29 @@ const actualizarvideojuego = async (req, res) => {
         const consulta =
             'UPDATE juegos SET nombre = $1, genero = $2, plataforma = $3, precio = $4, fecha_lanzamiento = $5, desarrollador = $6, descripcion = $7 WHERE id = $8 RETURNING *';
 
+       if (!nombre || !genero || !plataforma || !precio) {
+            return res.status(400).json({
+                exito: false,
+                mensaje: 'los campos nombre, genero, plataforma y precio son obligatorios'
+            });
+        }
+
         const valores = [nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion, id];
 
         const resultado = await pool.query(consulta, valores);
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({
+                exito:false,
+                mensaje: 'Videojuego no encontrado'
+            });
+        }
+        
+        res.status(201).json({
+            exito: true,
+            mensaje: 'Videojuego actualizado correctamente',
+            datos: resultado.rows[0]
+        });
         
     } catch (error) {
        console.error('Error:', error);
@@ -106,8 +126,40 @@ const actualizarvideojuego = async (req, res) => {
     }
 };
 
+const EliminarVideojuego = async (req, res) => {
+    try {
+        const {id} = req.params;
+
+        const consulta = 'DELETE FROM juegos WHERE id = $1 RETURNING *';
+        const resultado = await pool.query(consulta, [id]);
+
+        if (resultado.rows.length === 0) {
+            return res.status(404).json({
+                exito:false,
+                mensaje: 'Videojuego no encontrado'
+            });
+        }
+
+        res.status(201).json({
+            exito: true,
+            mensaje: 'Videojuego eliminado correctamente',
+            datos: resultado.rows[0]
+        });
+
+    } catch (error) {
+       console.error('Error:', error);
+        res.status(500).json({
+            exito: false,
+            mensaje: 'Error al Eliminar el videojuego',
+            error: error.message
+        }); 
+    }
+};
+
 module.exports = {   
     obtenertodoslosvideojuegos,
     obtenervideojuegosporid,
-    crearvideojuego
+    crearvideojuego,
+    ActualizarVideojuego,
+    EliminarVideojuego
 }
