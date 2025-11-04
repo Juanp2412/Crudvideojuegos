@@ -1,74 +1,243 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Videojuegos CRUD</title>
-  <style>
-    body {
-      font-family: Arial;
-      background: #111;
-      color: #eee;
-      text-align: center;
-      margin: 0;
-    }
-    table {
-      width: 90%;
-      margin: 20px auto;
-      border-collapse: collapse;
-      background: #222;
-    }
-    th, td {
-      border: 1px solid #555;
-      padding: 10px;
-    }
-    th {
-      background: #333;
-    }
-    a, button {
-      background: #00bcd4;
-      color: white;
-      padding: 5px 10px;
-      text-decoration: none;
-      border: none;
-      cursor: pointer;
-    }
-    a:hover, button:hover {
-      background: #0097a7;
-    }
-  </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>🎮 CRUD de Videojuegos</title>
+  <link rel="stylesheet" href="/css/estilos.css" />
 </head>
 <body>
-  <h1>Lista de Videojuegos</h1>
-  <a href="crear.html">➕ Crear nuevo</a>
+  <h1>🎮 CRUD de Videojuegos</h1>
+
+  <div class="top-bar">
+    <input type="text" id="buscar" placeholder="Buscar por nombre, género, plataforma...">
+    <input type="number" id="buscarId" placeholder="ID">
+    <button id="btnBuscarId">Buscar por ID</button>
+    <button id="btnCrear">➕ Crear Nuevo</button>
+  </div>
+
   <table>
     <thead>
       <tr>
-        <th>ID</th><th>Nombre</th><th>Género</th><th>Plataforma</th><th>Precio</th><th>Acciones</th>
+        <th>ID</th><th>Nombre</th><th>Género</th><th>Plataforma</th><th>Precio</th><th>Desarrollador</th><th>Acciones</th>
       </tr>
     </thead>
     <tbody id="tabla"></tbody>
   </table>
 
-  <script>
-    async function cargarVideojuegos() {
-      const res = await fetch('/api/videojuegos');
-      const data = await res.json();
+  <!-- Modal -->
+  <div class="modal" id="modalFormulario" role="dialog" aria-hidden="true">
+    <div class="modal-content" role="document">
+      <span class="close-btn" id="modalClose">&times;</span>
+      <h2 id="tituloModal">Nuevo Videojuego</h2>
 
-      const tabla = document.getElementById('tabla');
-      tabla.innerHTML = data.datos.map(v => `
+      <form id="formVideojuego">
+        <input type="hidden" id="id">
+        <input type="text" id="nombre" placeholder="Nombre" required>
+        <input type="text" id="genero" placeholder="Género" required>
+        <input type="text" id="plataforma" placeholder="Plataforma" required>
+        <input type="number" id="precio" placeholder="Precio" required>
+        <input type="text" id="desarrollador" placeholder="Desarrollador">
+        <textarea id="descripcion" placeholder="Descripción"></textarea>
+
+        <div class="modal-actions">
+          <button type="submit" id="btnGuardar">Guardar</button>
+          <button type="button" id="btnCancelar">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ELEMENTOS DOM
+    const tabla = document.getElementById('tabla');
+    const modal = document.getElementById('modalFormulario');
+    const form = document.getElementById('formVideojuego');
+    const buscarInput = document.getElementById('buscar');
+    const buscarIdInput = document.getElementById('buscarId');
+    const btnBuscarId = document.getElementById('btnBuscarId');
+    const btnCrear = document.getElementById('btnCrear');
+    const btnCancelar = document.getElementById('btnCancelar');
+    const modalClose = document.getElementById('modalClose');
+    const tituloModal = document.getElementById('tituloModal');
+
+    // ESTADO
+    let videojuegos = [];
+    let modo = 'crear'; // 'crear' o 'editar'
+    let idEditar = null;
+
+    // Cargar todos los videojuegos desde el backend
+    async function cargarVideojuegos() {
+      try {
+        const res = await fetch('/api/videojuegos');
+        const data = await res.json();
+        if (data.exito) {
+          videojuegos = data.datos;
+          mostrarVideojuegos(videojuegos);
+        } else {
+          tabla.innerHTML = '<tr><td colspan="7">No hay datos</td></tr>';
+        }
+      } catch (err) {
+        console.error('Error cargando videojuegos:', err);
+        tabla.innerHTML = '<tr><td colspan="7">Error al cargar datos</td></tr>';
+      }
+    }
+
+    // Mostrar lista (render)
+    function mostrarVideojuegos(lista) {
+      if (!lista.length) {
+        tabla.innerHTML = '<tr><td colspan="7">No hay resultados</td></tr>';
+        return;
+      }
+      tabla.innerHTML = lista.map(v => `
         <tr>
           <td>${v.id}</td>
-          <td>${v.nombre}</td>
-          <td>${v.genero}</td>
-          <td>${v.plataforma}</td>
-          <td>${v.precio}</td>
+          <td>${escapeHtml(v.nombre)}</td>
+          <td>${escapeHtml(v.genero)}</td>
+          <td>${escapeHtml(v.plataforma)}</td>
+          <td>$${v.precio}</td>
+          <td>${escapeHtml(v.desarrollador || '')}</td>
           <td>
-            <a href="editar.html?id=${v.id}">Editar</a>
+            <button class="editar" onclick="abrirModal('editar', ${v.id})">Editar</button>
+            <button class="eliminar" onclick="eliminar(${v.id})">Eliminar</button>
           </td>
         </tr>
       `).join('');
     }
 
+    // Seguridad básica: escapar HTML para evitar XSS al mostrar datos
+    function escapeHtml(text) {
+      if (text === null || text === undefined) return '';
+      return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Buscador global (tipo aptitude search)
+    buscarInput.addEventListener('input', e => {
+      const texto = e.target.value.toLowerCase();
+      const filtrados = videojuegos.filter(v =>
+        Object.values(v).some(val => String(val || '').toLowerCase().includes(texto))
+      );
+      mostrarVideojuegos(filtrados);
+    });
+
+    // Buscar por ID (usa endpoint GET /api/videojuegos/:id)
+    btnBuscarId.addEventListener('click', async () => {
+      const id = buscarIdInput.value.trim();
+      if (!id) return alert('Por favor ingresa un ID válido.');
+      try {
+        const res = await fetch(`/api/videojuegos/${id}`);
+        const data = await res.json();
+        if (data.exito) {
+          mostrarVideojuegos([data.datos]);
+        } else {
+          alert('No se encontró ese videojuego');
+          mostrarVideojuegos([]);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error al buscar por ID');
+      }
+    });
+
+    // Abrir modal
+    async function abrirModal(tipo, id = null) {
+      modo = tipo;
+      form.reset();
+      if (tipo === 'crear') {
+        tituloModal.textContent = 'Nuevo Videojuego';
+        idEditar = null;
+      } else {
+        tituloModal.textContent = 'Editar Videojuego';
+        idEditar = id;
+        try {
+          const res = await fetch(`/api/videojuegos/${id}`);
+          const data = await res.json();
+          if (data.exito) {
+            const v = data.datos;
+            document.getElementById('id').value = v.id;
+            document.getElementById('nombre').value = v.nombre || '';
+            document.getElementById('genero').value = v.genero || '';
+            document.getElementById('plataforma').value = v.plataforma || '';
+            document.getElementById('precio').value = v.precio || '';
+            document.getElementById('desarrollador').value = v.desarrollador || '';
+            document.getElementById('descripcion').value = v.descripcion || '';
+          } else {
+            alert('No se pudo cargar el videojuego para editar');
+            return;
+          }
+        } catch (err) {
+          console.error(err);
+          alert('Error al cargar el videojuego');
+          return;
+        }
+      }
+      modal.classList.add('show');
+      modal.setAttribute('aria-hidden', 'false');
+    }
+
+    // Cerrar modal
+    function cerrarModal() {
+      modal.classList.remove('show');
+      modal.setAttribute('aria-hidden', 'true');
+    }
+
+    // Guardar (crear o actualizar)
+    form.addEventListener('submit', async e => {
+      e.preventDefault();
+      const datos = {
+        nombre: document.getElementById('nombre').value,
+        genero: document.getElementById('genero').value,
+        plataforma: document.getElementById('plataforma').value,
+        precio: document.getElementById('precio').value,
+        desarrollador: document.getElementById('desarrollador').value,
+        descripcion: document.getElementById('descripcion').value
+      };
+
+      const metodo = modo === 'crear' ? 'POST' : 'PUT';
+      const url = modo === 'crear' ? '/api/videojuegos' : `/api/videojuegos/${idEditar}`;
+
+      try {
+        const res = await fetch(url, {
+          method: metodo,
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify(datos)
+        });
+        const data = await res.json();
+        alert(data.mensaje);
+        cerrarModal();
+        cargarVideojuegos();
+      } catch (err) {
+        console.error('Error guardando:', err);
+        alert('Error al guardar');
+      }
+    });
+
+    // Eliminar
+    async function eliminar(id) {
+      if (!confirm('¿Seguro que deseas eliminar este videojuego?')) return;
+      try {
+        const res = await fetch(`/api/videojuegos/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+        alert(data.mensaje);
+        cargarVideojuegos();
+      } catch (err) {
+        console.error('Error eliminando:', err);
+        alert('Error al eliminar');
+      }
+    }
+
+    // Eventos UI
+    btnCrear.addEventListener('click', () => abrirModal('crear'));
+    btnCancelar.addEventListener('click', cerrarModal);
+    modalClose.addEventListener('click', cerrarModal);
+    window.addEventListener('keydown', e => { if (e.key === 'Escape') cerrarModal(); });
+
+    // Inicia
     cargarVideojuegos();
   </script>
 </body>
