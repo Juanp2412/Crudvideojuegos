@@ -1,16 +1,17 @@
-const {pool} = require('../config/basedatos');
+const { pool } = require('../config/basedatos');
 
+// Obtener todos los videojuegos
 const obtenertodoslosvideojuegos = async (req, res) => {
     try {
-        const consulta = 'SELECT * FROM juegos ORDER BY ID ASC';
-        const resultado = await pool.query(consulta);
+        const consulta = 'SELECT * FROM juegos ORDER BY id ASC';
+        const [rows] = await pool.query(consulta);
 
         res.json({
             exito: true,
             mensaje: 'Videojuegos obtenidos correctamente',
-            datos: resultado.rows,
-            total: resultado.rows.length
-        })
+            datos: rows,
+            total: rows.length
+        });
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({
@@ -19,17 +20,18 @@ const obtenertodoslosvideojuegos = async (req, res) => {
             error: error.message
         });
     }
-};   
+};
 
+// Obtener videojuego por ID
 const obtenervideojuegosporid = async (req, res) => {
     try {
-        const {id} = req.params;
-        const consulta = 'SELECT * FROM juegos WHERE id = $1';
-        const resultado = await pool.query(consulta, [id]);
+        const { id } = req.params;
+        const consulta = 'SELECT * FROM juegos WHERE id = ?';
+        const [rows] = await pool.query(consulta, [id]);
 
-        if (resultado.rows.length === 0) {
+        if (rows.length === 0) {
             return res.status(404).json({
-                exito:false,
+                exito: false,
                 mensaje: 'Videojuego no encontrado'
             });
         }
@@ -37,11 +39,9 @@ const obtenervideojuegosporid = async (req, res) => {
         res.json({
             exito: true,
             mensaje: 'Videojuego obtenido correctamente',
-            datos: resultado.rows[0]
+            datos: rows[0]
         });
-
-
-        } catch (error) {
+    } catch (error) {
         console.error('Error:', error);
         res.status(500).json({
             exito: false,
@@ -51,29 +51,34 @@ const obtenervideojuegosporid = async (req, res) => {
     }
 };
 
+// Crear videojuego
 const crearvideojuego = async (req, res) => {
     try {
-        const {nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion} = req.body;
+        const { nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion } = req.body;
 
         if (!nombre || !genero || !plataforma || !precio) {
             return res.status(400).json({
                 exito: false,
-                mensaje: 'los campos nombre, genero, plataforma y precio son obligatorios'
+                mensaje: 'Los campos nombre, genero, plataforma y precio son obligatorios'
             });
         }
 
-        const consulta = 'INSERT INTO juegos (nombre,genero,plataforma,precio,fecha_lanzamiento,desarrollador,descripcion) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *';
+        const consulta = `
+            INSERT INTO juegos (nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        `;
 
         const valores = [nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion];
+        const [resultado] = await pool.query(consulta, valores);
 
-        const resultado = await pool.query(consulta, valores);
+        // Obtenemos el videojuego recién insertado
+        const [nuevo] = await pool.query('SELECT * FROM juegos WHERE id = ?', [resultado.insertId]);
 
         res.status(201).json({
             exito: true,
             mensaje: 'Videojuego creado correctamente',
-            datos: resultado.rows[0]
+            datos: nuevo[0]
         });
-
     } catch (error) {
         console.error('Error:', error);
         res.status(500).json({
@@ -84,82 +89,86 @@ const crearvideojuego = async (req, res) => {
     }
 };
 
+// Actualizar videojuego
 const ActualizarVideojuego = async (req, res) => {
     try {
-        const {id} = req.params;    
-        const {nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion} = req.body;
+        const { id } = req.params;
+        const { nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion } = req.body;
 
-        const consulta =
-            'UPDATE juegos SET nombre = $1, genero = $2, plataforma = $3, precio = $4, fecha_lanzamiento = $5, desarrollador = $6, descripcion = $7 WHERE id = $8 RETURNING *';
-
-       if (!nombre || !genero || !plataforma || !precio) {
+        if (!nombre || !genero || !plataforma || !precio) {
             return res.status(400).json({
                 exito: false,
-                mensaje: 'los campos nombre, genero, plataforma y precio son obligatorios'
+                mensaje: 'Los campos nombre, genero, plataforma y precio son obligatorios'
             });
         }
 
+        const consulta = `
+            UPDATE juegos
+            SET nombre = ?, genero = ?, plataforma = ?, precio = ?, fecha_lanzamiento = ?, desarrollador = ?, descripcion = ?
+            WHERE id = ?
+        `;
+
         const valores = [nombre, genero, plataforma, precio, fecha_lanzamiento, desarrollador, descripcion, id];
+        const [resultado] = await pool.query(consulta, valores);
 
-        const resultado = await pool.query(consulta, valores);
-
-        if (resultado.rows.length === 0) {
+        if (resultado.affectedRows === 0) {
             return res.status(404).json({
-                exito:false,
+                exito: false,
                 mensaje: 'Videojuego no encontrado'
             });
         }
-        
-        res.status(201).json({
+
+        const [actualizado] = await pool.query('SELECT * FROM juegos WHERE id = ?', [id]);
+
+        res.json({
             exito: true,
             mensaje: 'Videojuego actualizado correctamente',
-            datos: resultado.rows[0]
+            datos: actualizado[0]
         });
-        
     } catch (error) {
-       console.error('Error:', error);
+        console.error('Error:', error);
         res.status(500).json({
             exito: false,
             mensaje: 'Error al actualizar el videojuego',
             error: error.message
-        }); 
+        });
     }
 };
 
+// Eliminar videojuego
 const EliminarVideojuego = async (req, res) => {
     try {
-        const {id} = req.params;
+        const { id } = req.params;
+        const [rows] = await pool.query('SELECT * FROM juegos WHERE id = ?', [id]);
 
-        const consulta = 'DELETE FROM juegos WHERE id = $1 RETURNING *';
-        const resultado = await pool.query(consulta, [id]);
-
-        if (resultado.rows.length === 0) {
+        if (rows.length === 0) {
             return res.status(404).json({
-                exito:false,
+                exito: false,
                 mensaje: 'Videojuego no encontrado'
             });
         }
 
-        res.status(201).json({
+        await pool.query('DELETE FROM juegos WHERE id = ?', [id]);
+
+        res.json({
             exito: true,
             mensaje: 'Videojuego eliminado correctamente',
-            datos: resultado.rows[0]
+            datos: rows[0]
         });
-
     } catch (error) {
-       console.error('Error:', error);
+        console.error('Error:', error);
         res.status(500).json({
             exito: false,
-            mensaje: 'Error al Eliminar el videojuego',
+            mensaje: 'Error al eliminar el videojuego',
             error: error.message
-        }); 
+        });
     }
 };
 
-module.exports = {   
+module.exports = {
     obtenertodoslosvideojuegos,
     obtenervideojuegosporid,
     crearvideojuego,
     ActualizarVideojuego,
     EliminarVideojuego
-}
+};
